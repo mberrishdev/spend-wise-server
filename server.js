@@ -342,7 +342,7 @@ app.post("/api/transactions", validateApiKey, async (req, res) => {
 
 // POST endpoint to save OTP with API key
 app.post("/api/otps", validateApiKey, async (req, res) => {
-  console.log("=== POST /api/otps received ===");
+  console.log("=== POST /api/otps received ===", req);
   
   const { otpCode } = req.body;
   
