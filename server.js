@@ -337,6 +337,86 @@ app.post("/api/transactions", validateApiKey, async (req, res) => {
   }
 });
 
+// POST endpoint to save OTP with API key
+app.post("/api/otps", async (req, res) => {
+  console.log("=== POST /api/otps received ===");
+  
+  const { apiKey, otpCode } = req.body;
+  
+  // Validate required fields
+  if (!apiKey || !otpCode) {
+    return res.status(400).json({
+      success: false,
+      message: "Both apiKey and otpCode are required",
+    });
+  }
+  
+  // Validate API key format (basic validation)
+  if (typeof apiKey !== 'string' || apiKey.length < 10) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid API key format",
+    });
+  }
+  
+  // Validate OTP code format (basic validation)
+  if (typeof otpCode !== 'string' || otpCode.length < 4) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid OTP code format",
+    });
+  }
+  
+  try {
+    console.log("Timestamp:", new Date().toISOString());
+    console.log("API Key:", apiKey.substring(0, 8) + "...");
+    console.log("OTP Code:", otpCode.substring(0, 2) + "...");
+    
+    // Check if API key already exists
+    const existingOtpQuery = await db.collection("OTPS").where("apiKey", "==", apiKey).get();
+    
+    // Create OTP document with only API Key and OTP Code
+    const otpData = {
+      apiKey: apiKey,
+      otpCode: otpCode
+    };
+    
+    let otpRef;
+    let isUpdate = false;
+    
+    if (!existingOtpQuery.empty) {
+      // API key exists, update the existing document
+      const existingDoc = existingOtpQuery.docs[0];
+      otpRef = existingDoc.ref;
+      await otpRef.update(otpData);
+      isUpdate = true;
+      console.log(`✅ OTP updated successfully for existing API key: ${otpRef.id}`);
+    } else {
+      // API key doesn't exist, create new document
+      otpRef = await db.collection("OTPS").add(otpData);
+      console.log(`✅ OTP saved successfully with new ID: ${otpRef.id}`);
+    }
+    
+    res.status(isUpdate ? 200 : 201).json({
+      success: true,
+      message: isUpdate ? "OTP updated successfully" : "OTP saved successfully",
+      data: {
+        otpId: otpRef.id,
+        apiKey: apiKey.substring(0, 8) + "...",
+        action: isUpdate ? "updated" : "created"
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Error saving OTP:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error saving OTP",
+      error: error.message,
+    });
+  }
+});
+
 // Health check endpoint
 app.get("/api/health", (req, res) => {
   res.status(200).json({
@@ -353,6 +433,7 @@ app.get("/", (req, res) => {
     endpoints: {
       "POST /api/transactions":
         "Import transactions (requires X-API-Key header)",
+      "POST /api/otps": "Save OTP with API key to Firebase OTPS table",
       "GET /api/health": "Health check endpoint",
     },
   });

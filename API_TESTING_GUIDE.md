@@ -10,7 +10,9 @@ This guide explains how to test the complete API flow from generating an API key
 
 ## 🧪 Step 2: Test the API
 
-### Test with curl
+### Testing Transactions API
+
+#### Test with curl
 
 ```bash
 curl -X POST https://your-app.vercel.app/api/transactions \
@@ -40,7 +42,7 @@ curl -X POST https://your-app.vercel.app/api/transactions \
   }'
 ```
 
-### Test with JavaScript
+#### Test with JavaScript
 
 ```javascript
 const apiKey = 'YOUR_API_KEY_HERE';
@@ -78,7 +80,44 @@ fetch('https://your-app.vercel.app/api/transactions', {
 .catch(error => console.error('Error:', error));
 ```
 
-## 📊 Expected Response
+### Testing OTP API
+
+The OTP endpoint allows you to save API keys with OTP codes to the Firebase OTPS table.
+
+#### Test OTP with curl
+
+```bash
+curl -X POST https://your-app.vercel.app/api/otps \
+  -H "Content-Type: application/json" \
+  -d '{
+    "apiKey": "aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH",
+    "otpCode": "123456"
+  }'
+```
+
+#### Test OTP with JavaScript
+
+```javascript
+const otpData = {
+  apiKey: 'aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH',
+  otpCode: '123456'
+};
+
+fetch('https://your-app.vercel.app/api/otps', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(otpData)
+})
+.then(response => response.json())
+.then(data => console.log('OTP Success:', data))
+.catch(error => console.error('OTP Error:', error));
+```
+
+## 📊 Expected Responses
+
+### Transactions API Response
 
 If successful, you'll get:
 
@@ -101,14 +140,54 @@ If successful, you'll get:
 }
 ```
 
+### OTP API Response
+
+If successful (new OTP), you'll get:
+
+```json
+{
+  "success": true,
+  "message": "OTP saved successfully",
+  "data": {
+    "otpId": "abc123def456ghi789",
+    "apiKey": "aB3xY9mK...",
+    "action": "created"
+  }
+}
+```
+
+If successful (existing API key updated), you'll get:
+
+```json
+{
+  "success": true,
+  "message": "OTP updated successfully",
+  "data": {
+    "otpId": "abc123def456ghi789",
+    "apiKey": "aB3xY9mK...",
+    "action": "updated"
+  }
+}
+```
+
 ## 🔍 Step 3: Check Firebase
 
+### For Transactions
 1. **Go to Firebase Console** → Firestore Database
 2. **Navigate to**: `users/{userId}/expenses`
 3. **You should see** the imported transactions with:
    - `category: ""` (empty for manual categorization)
    - `source: "bank_import"`
    - `importedAt: "2025-06-27T20:25:56.768Z"`
+
+### For OTPs
+1. **Go to Firebase Console** → Firestore Database
+2. **Navigate to**: `OTPS` collection
+3. **You should see** the saved OTP documents with:
+   - `apiKey: "aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH"`
+   - `otpCode: "123456"`
+
+**Note**: Each API key is unique in the OTPS collection. If you send the same API key with a different OTP code, it will update the existing document rather than creating a new one.
 
 ## 📋 Step 4: Categorize Transactions
 
@@ -121,7 +200,9 @@ If successful, you'll get:
 
 ## 🚨 Error Scenarios
 
-### Invalid API Key
+### Transactions API Errors
+
+#### Invalid API Key
 ```json
 {
   "success": false,
@@ -129,7 +210,7 @@ If successful, you'll get:
 }
 ```
 
-### Missing API Key
+#### Missing API Key
 ```json
 {
   "success": false,
@@ -137,10 +218,36 @@ If successful, you'll get:
 }
 ```
 
-### Duplicate Transaction
+#### Duplicate Transaction
 - Transaction will be skipped
 - `skippedCount` will increase
 - Transaction ID will be in `skippedTransactions` array
+
+### OTP API Errors
+
+#### Missing Required Fields
+```json
+{
+  "success": false,
+  "message": "Both apiKey and otpCode are required"
+}
+```
+
+#### Invalid API Key Format
+```json
+{
+  "success": false,
+  "message": "Invalid API key format"
+}
+```
+
+#### Invalid OTP Code Format
+```json
+{
+  "success": false,
+  "message": "Invalid OTP code format"
+}
+```
 
 ## 🔧 Environment Variables for Vercel
 
@@ -169,6 +276,7 @@ import { UncategorizedTransactions } from "@/components/UncategorizedTransaction
 
 ## 🎯 Complete Flow Summary
 
+### Transactions Flow
 1. ✅ **User generates API key** in Settings
 2. ✅ **API key is saved** to Firebase
 3. ✅ **External system calls API** with transactions + API key
@@ -176,6 +284,14 @@ import { UncategorizedTransactions } from "@/components/UncategorizedTransaction
 5. ✅ **Transactions are saved** to Firebase with empty categories
 6. ✅ **User categorizes transactions** manually in the app
 7. ✅ **Categorized transactions** appear in normal expense tracking
+
+### OTP Flow
+1. ✅ **External system calls OTP API** with API key + OTP code
+2. ✅ **Server validates input** (API key and OTP format)
+3. ✅ **Server checks if API key exists** in OTPS collection
+4. ✅ **If exists**: Updates existing OTP code for that API key
+5. ✅ **If new**: Creates new document with API key and OTP code
+6. ✅ **OTP can be retrieved** and validated by other systems
 
 ## 🔒 Security Notes
 
