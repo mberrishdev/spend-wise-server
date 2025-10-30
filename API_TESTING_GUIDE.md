@@ -82,15 +82,15 @@ fetch('https://your-app.vercel.app/api/transactions', {
 
 ### Testing OTP API
 
-The OTP endpoint allows you to save API keys with OTP codes to the Firebase OTPS table.
+The OTP endpoint allows you to save OTP codes for users. The API key is provided in the header (X-API-Key) and the server uses it to identify the user.
 
 #### Test OTP with curl
 
 ```bash
 curl -X POST https://your-app.vercel.app/api/otps \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH" \
   -d '{
-    "apiKey": "aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH",
     "otpCode": "123456"
   }'
 ```
@@ -99,14 +99,14 @@ curl -X POST https://your-app.vercel.app/api/otps \
 
 ```javascript
 const otpData = {
-  apiKey: 'aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH',
   otpCode: '123456'
 };
 
 fetch('https://your-app.vercel.app/api/otps', {
   method: 'POST',
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'X-API-Key': 'aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH'
   },
   body: JSON.stringify(otpData)
 })
@@ -150,13 +150,13 @@ If successful (new OTP), you'll get:
   "message": "OTP saved successfully",
   "data": {
     "otpId": "abc123def456ghi789",
-    "apiKey": "aB3xY9mK...",
+    "userId": "user123",
     "action": "created"
   }
 }
 ```
 
-If successful (existing API key updated), you'll get:
+If successful (existing user OTP updated), you'll get:
 
 ```json
 {
@@ -164,7 +164,7 @@ If successful (existing API key updated), you'll get:
   "message": "OTP updated successfully",
   "data": {
     "otpId": "abc123def456ghi789",
-    "apiKey": "aB3xY9mK...",
+    "userId": "user123",
     "action": "updated"
   }
 }
@@ -184,10 +184,10 @@ If successful (existing API key updated), you'll get:
 1. **Go to Firebase Console** → Firestore Database
 2. **Navigate to**: `OTPS` collection
 3. **You should see** the saved OTP documents with:
-   - `apiKey: "aB3xY9mK2pQ7vR4tU8wE1nL5sA6dF0gH"`
+   - `userId: "user123"`
    - `otpCode: "123456"`
 
-**Note**: Each API key is unique in the OTPS collection. If you send the same API key with a different OTP code, it will update the existing document rather than creating a new one.
+**Note**: Each userId is unique in the OTPS collection. If you send a new OTP for the same user (same API key), it will update the existing document rather than creating a new one.
 
 ## 📋 Step 4: Categorize Transactions
 
@@ -229,15 +229,23 @@ If successful (existing API key updated), you'll get:
 ```json
 {
   "success": false,
-  "message": "Both apiKey and otpCode are required"
+  "message": "otpCode is required"
 }
 ```
 
-#### Invalid API Key Format
+#### Missing API Key Header
 ```json
 {
   "success": false,
-  "message": "Invalid API key format"
+  "message": "API key is required. Please provide X-API-Key header."
+}
+```
+
+#### Invalid API Key
+```json
+{
+  "success": false,
+  "message": "Invalid API key"
 }
 ```
 
@@ -286,12 +294,13 @@ import { UncategorizedTransactions } from "@/components/UncategorizedTransaction
 7. ✅ **Categorized transactions** appear in normal expense tracking
 
 ### OTP Flow
-1. ✅ **External system calls OTP API** with API key + OTP code
-2. ✅ **Server validates input** (API key and OTP format)
-3. ✅ **Server checks if API key exists** in OTPS collection
-4. ✅ **If exists**: Updates existing OTP code for that API key
-5. ✅ **If new**: Creates new document with API key and OTP code
-6. ✅ **OTP can be retrieved** and validated by other systems
+1. ✅ **External system calls OTP API** with API key in header + OTP code in body
+2. ✅ **Server validates API key** from header and identifies user
+3. ✅ **Server validates OTP format** from request body
+4. ✅ **Server checks if userId exists** in OTPS collection
+5. ✅ **If exists**: Updates existing OTP code for that user
+6. ✅ **If new**: Creates new document with userId and OTP code
+7. ✅ **OTP can be retrieved** and validated by other systems
 
 ## 🔒 Security Notes
 
