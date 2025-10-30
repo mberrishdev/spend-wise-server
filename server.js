@@ -53,9 +53,9 @@ const validateApiKey = async (req, res, next) => {
   console.log(`Validating API key: ${apiKey.substring(0, 8)}...`);
 
   try {
-    let userDoc = null; 
-    let foundPath = null; 
-    
+    let userDoc = null;
+    let foundPath = null;
+
     console.log(
       "No user found with direct queries, checking subcollections..."
     );
@@ -343,37 +343,38 @@ app.post("/api/transactions", validateApiKey, async (req, res) => {
 // POST endpoint to save OTP with API key
 app.post("/api/otps", validateApiKey, async (req, res) => {
   console.log("=== POST /api/otps received ===", req.body);
-  
+
   const { otpCode } = req.body;
-  
-  // Validate required fields
+
   if (!otpCode) {
     return res.status(400).json({
       success: false,
       message: "otpCode is required",
     });
   }
-  
-  // Validate OTP code format (basic validation)
-  if (typeof otpCode !== 'string' || otpCode.length < 4) {
+
+  if (typeof otpCode !== "string" || otpCode.length < 4) {
     return res.status(400).json({
       success: false,
       message: "Invalid OTP code format",
     });
   }
-  
+
   try {
     const userId = req.userId; // Get userId from validateApiKey middleware
-    const existingOtpQuery = await db.collection("OTPS").where("userId", "==", userId).get();
-    
+    const existingOtpQuery = await db
+      .collection("OTPS")
+      .where("userId", "==", userId)
+      .get();
+
     const otpData = {
       userId: userId,
-      otpCode: otpCode
+      otpCode: otpCode,
     };
-    
+
     let otpRef;
     let isUpdate = false;
-    
+
     if (!existingOtpQuery.empty) {
       const existingDoc = existingOtpQuery.docs[0];
       otpRef = existingDoc.ref;
@@ -385,22 +386,62 @@ app.post("/api/otps", validateApiKey, async (req, res) => {
       otpRef = await db.collection("OTPS").add(otpData);
       console.log(`✅ OTP saved successfully for user: ${userId}`);
     }
-    
+
     res.status(isUpdate ? 200 : 201).json({
       success: true,
-      message: isUpdate ? "OTP updated successfully" : "OTP saved successfully",
-      data: {
-        otpId: otpRef.id,
-        userId: userId,
-        action: isUpdate ? "updated" : "created"
-      }
     });
-    
   } catch (error) {
     console.error("❌ Error saving OTP:", error);
     res.status(500).json({
       success: false,
       message: "Error saving OTP",
+      error: error.message,
+    });
+  }
+});
+
+// GET endpoint to retrieve OTP code based on API key
+app.get("/api/otps", validateApiKey, async (req, res) => {
+  console.log("=== GET /api/otps received ===");
+  
+  try {
+    const userId = req.userId; 
+    
+    console.log("Timestamp:", new Date().toISOString());
+    console.log("User ID:", userId);
+    
+    // Find OTP document for this user
+    const otpQuery = await db.collection("OTPS").where("userId", "==", userId).get();
+    
+    if (otpQuery.empty) {
+      console.log(`❌ No OTP found for user: ${userId}`);
+      return res.status(404).json({
+        success: false,
+        message: "No OTP found for this user",
+      });
+    }
+    
+    // Get the OTP document
+    const otpDoc = otpQuery.docs[0];
+    const otpData = otpDoc.data();
+    
+    console.log(`✅ OTP retrieved successfully for user: ${userId}`);
+    
+    res.status(200).json({
+      success: true,
+      message: "OTP retrieved successfully",
+      data: {
+        otpId: otpDoc.id,
+        userId: userId,
+        otpCode: otpData.otpCode
+      }
+    });
+    
+  } catch (error) {
+    console.error("❌ Error retrieving OTP:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error retrieving OTP",
       error: error.message,
     });
   }
@@ -412,19 +453,6 @@ app.get("/api/health", (req, res) => {
     status: "OK",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-  });
-});
-
-// Root endpoint
-app.get("/", (req, res) => {
-  res.json({
-    message: "Spend Wise Express.js Server",
-    endpoints: {
-      "POST /api/transactions":
-        "Import transactions (requires X-API-Key header)",
-      "POST /api/otps": "Save OTP with API key to Firebase OTPS table",
-      "GET /api/health": "Health check endpoint",
-    },
   });
 });
 
