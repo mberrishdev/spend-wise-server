@@ -53,6 +53,9 @@ const validateApiKey = async (req, res, next) => {
   console.log(`Validating API key: ${apiKey.substring(0, 8)}...`);
 
   try {
+    let userDoc = null; 
+    let foundPath = null; 
+    
     console.log(
       "No user found with direct queries, checking subcollections..."
     );
